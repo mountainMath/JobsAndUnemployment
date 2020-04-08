@@ -17,7 +17,9 @@ require(mapcan)
 require(rapport)
 #require(tictoc)
 
-simpleCache <- function(object,key,path="data",refresh=FALSE){
+if (!dir.exists("data/cache")) dir.create("data/cache")
+
+simpleCache <- function(object,key,path="data/cache",refresh=FALSE){
   cache_path=file.path(path,key)
   if(!refresh & file.exists(cache_path)) {
     readRDS(cache_path)
