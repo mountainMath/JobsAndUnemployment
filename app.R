@@ -15,6 +15,18 @@ require(maps)
 require(ggsci)
 require(mapcan)
 require(rapport)
+#require(tictoc)
+
+simpleCache <- function(object,key,path="data",refresh=FALSE){
+  cache_path=file.path(path,key)
+  if(!refresh & file.exists(cache_path)) {
+    readRDS(cache_path)
+  } else {
+    data=object
+    saveRDS(data,file=cache_path)
+    data
+  }
+}
 
 # read in unemployment data
 unempData <- read.csv("data/unempFinalData.csv", head=T, sep=",")
@@ -325,7 +337,7 @@ server <- function(input, output, session) {
   ### unemployment plots
   output$unempMap <- renderGirafe({
     input$updateUnemp
-    isolate({unempMapData <- subset(unempData, Statistics == input$unempStatistic  &
+    isolate(simpleCache({unempMapData <- subset(unempData, Statistics == input$unempStatistic  &
                                 substr(refPeriod,0,7) == substr(input$unempRefPeriod[2],0,7) &
                                 Sex == input$unempSex &
                                 Age.group == input$unempAge &
@@ -350,14 +362,20 @@ server <- function(input, output, session) {
       labs(title= paste(strwrap(paste0(input$unempStatistic,", ",format(input$unempRefPeriod[2], "%b %Y")), 
                                        width = 45), collapse = "\n"))
     
-    girafe(ggobj = unempMapPlot, width_svg = 5)})
+    girafe(ggobj = unempMapPlot, width_svg = 5)},
+    paste0("unempMap",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[2],
+                    input$unempAge,
+                    input$unempSex),
+                  collapse="_"))))
     
   })
   
   # Plot of statistic over reference period
   output$unempYears <- renderGirafe({
     (input$updateUnemp | input$updateYearsUnemp)
-    isolate({if (is.null(input$unempByGeo) & is.null(input$unempByAge) & is.null(input$unempBySex)) 
+    isolate(simpleCache({if (is.null(input$unempByGeo) & is.null(input$unempByAge) & is.null(input$unempBySex)) 
       unempYearsData <- subset(unempData, Statistics == input$unempStatistic &
                                   substr(refPeriod,0,7) >= substr(input$unempRefPeriod[1],0,7) &
                                   substr(refPeriod,0,7) <= substr(input$unempRefPeriod[2],0,7) &
@@ -397,8 +415,16 @@ server <- function(input, output, session) {
                              x="Reference period", 
                              title = paste(strwrap(paste0(input$unempStatistic," by year"), width = 75), collapse = "\n"),
                              colour=NULL) 
-    
-    girafe(ggobj = unempYearsPlot, width_svg = 8, height_svg = 4)})
+
+    girafe(ggobj = unempYearsPlot, width_svg = 8, height_svg = 4)},
+    paste0("unempYears",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[1],
+                    input$unempRefPeriod[2],
+                    input$unempByAge,
+                    input$unempByGeo,
+                    input$unempBySex),
+                  collapse="_"))))
     
   })
 
@@ -426,7 +452,7 @@ server <- function(input, output, session) {
   
   output$unempSexPlot <- renderGirafe({
     input$updateUnemp
-    isolate({unempSexPlot <- ggplot(unempSexData()) + 
+    isolate(simpleCache({unempSexPlot <- ggplot(unempSexData()) + 
                       geom_col_interactive(aes(x=Sex, y=VALUE, alpha = highlight, fill=month, tooltip=VALUE), position="dodge") + 
                       theme_classic() + scale_fill_jco() + theme(text=element_text(family="Roboto"),legend.position = "bottom") +
                       scale_alpha(range = c(max(0.45, min(unempSexData()$highlight)),1)) +
@@ -436,8 +462,14 @@ server <- function(input, output, session) {
                            fill = NULL,
                            title = paste(strwrap(paste0(input$unempStatistic," by sex, ",
                                                         format(input$unempRefPeriod[2], "%b %Y")), width = 40), collapse = "\n"))
-    
-    girafe(ggobj = unempSexPlot, height_svg = 5, width_svg = 4)})
+    girafe(ggobj = unempSexPlot, height_svg = 5, width_svg = 4)},
+    paste0("unempSexPlot_",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[2],
+                    input$unempAge,
+                    input$unempGeo,
+                    input$unempSex),
+                  collapse="_"))))
   })
   
   unempAgeData <- reactive ({
@@ -463,7 +495,7 @@ server <- function(input, output, session) {
   
   output$unempAgePlot <- renderGirafe({
     input$updateUnemp
-    isolate({unempAgePlot <- ggplot(unempAgeData()) + 
+    isolate(simpleCache({unempAgePlot <- ggplot(unempAgeData()) + 
                 geom_col_interactive(aes(x=Age.group, y=VALUE, alpha = highlight, fill=month, tooltip=VALUE), position = "dodge") + 
                 theme_classic() + scale_fill_jco() + theme(text=element_text(family="Roboto"),legend.position = "bottom") +
                 scale_alpha(range = c(max(0.45, min(unempAgeData()$highlight)),1)) +
@@ -473,8 +505,15 @@ server <- function(input, output, session) {
                      fill = NULL,
                      title = paste(strwrap(paste0(input$unempStatistic," by age group, ",
                                                   format(input$unempRefPeriod[2], "%b %Y")), width = 40), collapse = "\n"))
-              
-              girafe(ggobj = unempAgePlot, height_svg = 5, width_svg = 4)})
+              girafe(ggobj = unempAgePlot, height_svg = 5, width_svg = 4)},
+         paste0("unempAgePlot_",
+                paste0(c(input$unempStatistic,
+                         input$unempRefPeriod[2],
+                         input$unempAge,
+                         input$unempGeo,
+                         input$unempSex),
+                       collapse="_")))
+         )
 
   })
   
@@ -538,7 +577,7 @@ server <- function(input, output, session) {
   ### employment plots
   output$empMap <- renderGirafe({
     input$updateEmp
-    isolate({empMapData <- subset(empData, Statistics == input$empStatistic  &
+    isolate(simpleCache({empMapData <- subset(empData, Statistics == input$empStatistic  &
                                       substr(refPeriod,0,7) == substr(input$empRefPeriod[2],0,7) &
                                       Sex == input$empSex &
                                       Age.group == input$empAge &
@@ -562,15 +601,21 @@ server <- function(input, output, session) {
       scale_fill_material("blue", name=paste(strwrap(paste(input$empStatistic),width=25), collapse="\n")) +
       labs(title= paste(strwrap(paste0(input$empStatistic,", ",format(input$empRefPeriod[2], "%b %Y")), 
                                 width = 45), collapse = "\n"))
-    
-    girafe(ggobj = empMapPlot, width_svg = 5)})
+   
+    girafe(ggobj = empMapPlot, width_svg = 5)},
+    paste0("empMap",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[2],
+                    input$unempAge,
+                    input$unempSex),
+                  collapse="_"))))
     
   })
   
   # Plot of statistic over reference period
   output$empYears <- renderGirafe({
     (input$updateEmp | input$updateYearsEmp)
-    isolate({if (is.null(input$empByGeo) & is.null(input$empByAge) & is.null(input$empBySex)) 
+    isolate(simpleCache({if (is.null(input$empByGeo) & is.null(input$empByAge) & is.null(input$empBySex)) 
       empYearsData <- subset(empData, Statistics == input$empStatistic &
                                  substr(refPeriod,0,7) >= substr(input$empRefPeriod[1],0,7) &
                                  substr(refPeriod,0,7) <= substr(input$empRefPeriod[2],0,7) &
@@ -611,7 +656,15 @@ server <- function(input, output, session) {
            title = paste(strwrap(paste0(input$empStatistic," by year"), width = 75), collapse = "\n"),
            colour=NULL) 
     
-    girafe(ggobj = empYearsPlot, width_svg = 8, height_svg = 4)})
+    girafe(ggobj = empYearsPlot, width_svg = 8, height_svg = 4)},
+    paste0("empYears",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[1],
+                    input$unempRefPeriod[2],
+                    intput$empByGeo,
+                    input$unempByAge,
+                    input$unempBySex),
+                  collapse="_"))))
     
   })
   
@@ -639,7 +692,7 @@ server <- function(input, output, session) {
   
   output$empSexPlot <- renderGirafe({
     input$updateEmp
-    isolate({empSexPlot <- ggplot(empSexData()) + 
+    isolate(simpleCache({empSexPlot <- ggplot(empSexData()) + 
       geom_col_interactive(aes(x=Sex, y=VALUE, alpha = highlight, fill=month, tooltip=VALUE), position="dodge") + 
       theme_classic() + scale_fill_jco() + theme(text=element_text(family="Roboto"),legend.position = "bottom") +
       scale_alpha(range = c(max(0.45, min(empSexData()$highlight)),1)) +
@@ -650,7 +703,14 @@ server <- function(input, output, session) {
            title = paste(strwrap(paste0(input$empStatistic," by sex, ",
                                         format(input$empRefPeriod[2], "%b %Y")), width = 40), collapse = "\n"))
     
-    girafe(ggobj = empSexPlot, height_svg = 5, width_svg = 4)})
+    girafe(ggobj = empSexPlot, height_svg = 5, width_svg = 4)},
+    paste0("empSexPlot",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[2],
+                    input$unempAge,
+                    input$empGeo,
+                    input$unempSex),
+                  collapse="_"))))
   })
   
   empAgeData <- reactive ({
@@ -676,7 +736,7 @@ server <- function(input, output, session) {
   
   output$empAgePlot <- renderGirafe({
     input$updateEmp
-    isolate({empAgePlot <- ggplot(empAgeData()) + 
+    isolate(simpleCache({empAgePlot <- ggplot(empAgeData()) + 
       geom_col_interactive(aes(x=Age.group, y=VALUE, alpha = highlight, fill=month, tooltip=VALUE), position = "dodge") + 
       theme_classic() + scale_fill_jco() + theme(text=element_text(family="Roboto"),legend.position = "bottom") +
       scale_alpha(range = c(max(0.45, min(empAgeData()$highlight)),1)) +
@@ -686,8 +746,15 @@ server <- function(input, output, session) {
            fill = NULL,
            title = paste(strwrap(paste0(input$empStatistic," by age group, ",
                                         format(input$empRefPeriod[2], "%b %Y")), width = 40), collapse = "\n"))
-    
-    girafe(ggobj = empAgePlot, height_svg = 5, width_svg = 4)})
+
+    girafe(ggobj = empAgePlot, height_svg = 5, width_svg = 4)},
+    paste0("empAgePlot",
+           paste0(c(input$unempStatistic,
+                    input$unempRefPeriod[2],
+                    input$unempAge,
+                    input$empGeo,
+                    input$unempSex),
+                  collapse="_"))))
     
   })
   
